@@ -14,16 +14,19 @@ class ControllerBase
 
   # Helper method to alias @already_built_response
   def already_built_response?
-      if @res.no_entity_body?
-        @already_built_response = false
-      else
-        @already_built_response = true
-      end
-      @already_built_response
+      @already_built_response == true
   end
 
   # Set the response status code and header
   def redirect_to(url)
+      @res.status = 302
+      @res['Location'] = url
+
+      if !already_built_response?
+        @already_built_response = true
+      else
+        raise_error
+      end
   end
 
   # Populate the response with content.
@@ -31,14 +34,25 @@ class ControllerBase
   # Raise an error if the developer tries to double render.
   def render_content(content, content_type)
       @res['Content-Type'] = content_type
+
       if !already_built_response?
-        @res.write(content) 
+        @res.write(content)
+        @already_built_response = true
+      else
+        raise_error
       end
+      # end
   end
 
   # use ERB and binding to evaluate templates
   # pass the rendered html to render_content
   def render(template_name)
+    controller_name = ActiveSupport::Inflector.underscore(self.class.to_s)
+    content = File.read("views/#{controller_name}/#{template_name}.html.erb")
+    template = ERB.new(content)
+    render_content(template.result(binding), 'text/html')
+
+
   end
 
   # method exposing a `Session` object
@@ -49,4 +63,3 @@ class ControllerBase
   def invoke_action(name)
   end
 end
-
